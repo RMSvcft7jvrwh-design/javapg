@@ -3,7 +3,3 @@ public class Hello {
         System.out.println("おはよう、Java");
     }
 }
-
-public static void main() {
-    System.out.println("おはよう、Java");
-}
