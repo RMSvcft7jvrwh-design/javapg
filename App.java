@@ -10,18 +10,29 @@ import java.sql.PreparedStatement; // ★ 値を安全にSQLへ渡します。
 import java.sql.ResultSet; // ★ SELECTの結果を読みます。
 import java.sql.SQLException; // ★ SQLのエラーを扱います。
 import java.sql.Statement; // ★ テーブル作成に使います。
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+
+enum TodoStatus { // Todoが進む3つの状態を表します。
+    NOT_STARTED, IN_PROGRESS, DONE
+}
 
 class DbTodo { // ★ Main.javaのTodoと名前が重ならないようにします。
     private final int id;
     private final String title;
-    private final boolean done; // ★ DBから読み取った完了状態を保持します。
+    private final TodoStatus status; // DBから読み取った進行状態を保持します。
+    private final Long startedAt; // 開始時刻をミリ秒で保持します。未開始ならnullです。
+    private final Long completedAt; // 完了時刻をミリ秒で保持します。未完了ならnullです。
 
-    DbTodo(int id, String title, boolean done) { // ★ SELECTの3列を受け取ります。
+    DbTodo(int id, String title, TodoStatus status, Long startedAt, Long completedAt) {
         this.id = id;
         this.title = title;
-        this.done = done; // ★ 0/1を変換した値を保存します。
+        this.status = status;
+        this.startedAt = startedAt;
+        this.completedAt = completedAt;
     }
 
     int getId() {
@@ -32,13 +43,27 @@ class DbTodo { // ★ Main.javaのTodoと名前が重ならないようにしま
         return title;
     }
 
-    boolean isDone() {
-        return done;
+    TodoStatus getStatus() {
+        return status;
+    }
+
+    Long getStartedAt() {
+        return startedAt;
+    }
+
+    Long getCompletedAt() {
+        return completedAt;
+    }
+
+    boolean isDone() { // 既存のJSON API用に完了かどうかを返します。
+        return status == TodoStatus.DONE;
     }
 }
 
 public class App {
     private static final String DB_URL = "jdbc:sqlite:todos.db"; // ★ 保存先のSQLiteファイルです。
+    private static final DateTimeFormatter START_FORMAT = DateTimeFormatter
+            .ofPattern("yyyy/MM/dd HH:mm").withZone(ZoneId.systemDefault());
 
     public static void main(String[] args) throws Exception {
         createTable(); // ★ 起動時にtodos表を用意します。
@@ -71,29 +96,79 @@ public class App {
         return DriverManager.getConnection(DB_URL); // ★ jdbc:sqlite:todos.dbへ接続します。
     }
 
-    private static void createTable() throws SQLException { // ★ 表がなければ作ります。
-        try (Connection connection = connect(); Statement statement = connection.createStatement()) { // ★
-                                                                                                      // 接続とSQLを自動で閉じます。
-            statement.executeUpdate("CREATE TABLE IF NOT EXISTS todos "
-                    + "(id INTEGER PRIMARY KEY, title TEXT, done INTEGER)"); // ★ 指定された3列を作ります。
+    private static void createTable() throws SQLException { // 表を作り、古いdone列から状態を引き継ぎます。
+        try (Connection connection = connect()) {
+            connection.setAutoCommit(false); // 移行中に失敗したら元へ戻せるようにします。
+            try (Statement statement = connection.createStatement()) {
+                statement.executeUpdate("CREATE TABLE IF NOT EXISTS todos "
+                        + "(id INTEGER PRIMARY KEY, title TEXT, "
+                        + "status TEXT NOT NULL DEFAULT 'NOT_STARTED', "
+                        + "started_at INTEGER, completed_at INTEGER)"); // 開始・完了時刻も保存します。
+                boolean hasStatus = false;
+                boolean hasStartedAt = false;
+                boolean hasCompletedAt = false;
+                try (ResultSet columns = statement.executeQuery("PRAGMA table_info(todos)")) {
+                    while (columns.next()) {
+                        String column = columns.getString("name");
+                        if ("status".equals(column)) {
+                            hasStatus = true;
+                        } else if ("started_at".equals(column)) {
+                            hasStartedAt = true;
+                        } else if ("completed_at".equals(column)) {
+                            hasCompletedAt = true;
+                        }
+                    }
+                }
+                if (!hasStatus) { // 以前のdone列だけがあるDBを更新します。
+                    statement.executeUpdate("ALTER TABLE todos ADD COLUMN "
+                            + "status TEXT NOT NULL DEFAULT 'NOT_STARTED'");
+                    statement.executeUpdate("UPDATE todos SET status = 'DONE' WHERE done = 1");
+                }
+                if (!hasStartedAt) {
+                    statement.executeUpdate("ALTER TABLE todos ADD COLUMN started_at INTEGER");
+                }
+                if (!hasCompletedAt) {
+                    statement.executeUpdate("ALTER TABLE todos ADD COLUMN completed_at INTEGER");
+                }
+                connection.commit();
+            } catch (SQLException e) {
+                connection.rollback(); // 途中までの変更を残しません。
+                throw e;
+            }
         }
     }
 
-    private static void insertTodo(String title) throws SQLException { // ★ 追加はINSERTで行います。
-        String sql = "INSERT INTO todos (title, done) VALUES (?, 0)"; // ★ IDはSQLiteに採番させます。
+    private static void insertTodo(String title) throws SQLException { // 追加時は未着手にします。
+        String sql = "INSERT INTO todos (title, status) VALUES (?, ?)"; // IDはSQLiteに採番させます。
         try (Connection connection = connect(); PreparedStatement statement = connection.prepareStatement(sql)) { // ★
                                                                                                                   // 値を埋め込まずに渡します。
             statement.setString(1, title); // ★ 1番目の?にタイトルを設定します。
+            statement.setString(2, TodoStatus.NOT_STARTED.name()); // 新しいTodoの状態です。
             statement.executeUpdate(); // ★ 1件追加します。
         }
     }
 
-    private static void completeTodo(int id) throws SQLException { // ★ 完了はUPDATEで行います。
-        String sql = "UPDATE todos SET done = 1 WHERE id = ?"; // ★ 指定したIDだけを更新します。
+    private static void startTodo(int id) throws SQLException { // 未着手のTodoだけ開始します。
+        String sql = "UPDATE todos SET status = ?, started_at = ?, completed_at = NULL "
+                + "WHERE id = ? AND status = ?";
+        try (Connection connection = connect(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, TodoStatus.IN_PROGRESS.name());
+            statement.setLong(2, System.currentTimeMillis()); // 開始ボタンを押した時刻です。
+            statement.setInt(3, id);
+            statement.setString(4, TodoStatus.NOT_STARTED.name());
+            statement.executeUpdate();
+        }
+    }
+
+    private static void completeTodo(int id) throws SQLException { // 作業中のTodoだけ完了します。
+        String sql = "UPDATE todos SET status = ?, completed_at = ? WHERE id = ? AND status = ?";
         try (Connection connection = connect(); PreparedStatement statement = connection.prepareStatement(sql)) { // ★
                                                                                                                   // SQLを準備します。
-            statement.setInt(1, id); // ★ 1番目の?にIDを設定します。
-            statement.executeUpdate(); // ★ 完了状態を保存します。
+            statement.setString(1, TodoStatus.DONE.name());
+            statement.setLong(2, System.currentTimeMillis()); // 完了ボタンを押した時刻です。
+            statement.setInt(3, id);
+            statement.setString(4, TodoStatus.IN_PROGRESS.name());
+            statement.executeUpdate(); // 完了状態を保存します。
         }
     }
 
@@ -106,15 +181,32 @@ public class App {
         }
     }
 
+    private static void deleteCompletedTodos() throws SQLException { // 完了済みだけをまとめて削除します。
+        String sql = "DELETE FROM todos WHERE status = ?";
+        try (Connection connection = connect(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, TodoStatus.DONE.name()); // 対象を完了状態に限定します。
+            statement.executeUpdate(); // 条件に合うTodoを1回のSQLで削除します。
+        }
+    }
+
     private static List<DbTodo> selectTodos() throws SQLException { // ★ 一覧は毎回SELECTで取得します。
         List<DbTodo> todos = new ArrayList<>(); // ★ 検索結果を入れる一覧です。
-        String sql = "SELECT id, title, done FROM todos ORDER BY id"; // ★ ID順に読みます。
+        String sql = "SELECT id, title, status, started_at, completed_at FROM todos ORDER BY id";
         try (Connection connection = connect();
                 PreparedStatement statement = connection.prepareStatement(sql);
                 ResultSet results = statement.executeQuery()) { // ★ 検索後に資源を閉じます。
             while (results.next()) { // ★ 行を1件ずつ取り出します。
-                todos.add(new DbTodo(results.getInt("id"), results.getString("title"),
-                        results.getInt("done") == 1)); // ★ DBの0/1をbooleanに変えます。
+                String status = results.getString("status");
+                long startValue = results.getLong("started_at");
+                Long startedAt = results.wasNull() ? null : startValue;
+                long completedValue = results.getLong("completed_at");
+                Long completedAt = results.wasNull() ? null : completedValue;
+                try {
+                    todos.add(new DbTodo(results.getInt("id"), results.getString("title"),
+                            TodoStatus.valueOf(status), startedAt, completedAt)); // 時刻も読み込みます。
+                } catch (IllegalArgumentException | NullPointerException e) {
+                    throw new SQLException("不正なTodoの状態: " + status, e);
+                }
             }
         }
         return todos; // ★ 画面表示に使う一覧を返します。
@@ -136,10 +228,18 @@ public class App {
                 redirect(exchange); // ★ 一覧へ戻します。
                 return;
             }
-            if (path.equals("/done") && method.equals("GET")) { // ★ 完了リンクを処理します。
-                Integer id = requestedId(exchange); // ★ リンクのIDを読みます。
+            if (path.equals("/start") && method.equals("POST")) { // 開始ボタンを処理します。
+                Integer id = requestedId(exchange);
+                if (id != null) {
+                    startTodo(id); // 未着手から作業中にします。
+                }
+                redirect(exchange);
+                return;
+            }
+            if (path.equals("/done") && method.equals("POST")) { // 完了ボタンを処理します。
+                Integer id = requestedId(exchange);
                 if (id != null) { // ★ 数字のIDだけを扱います。
-                    completeTodo(id); // ★ UPDATEを呼びます。
+                    completeTodo(id); // 作業中から完了にします。
                 }
                 redirect(exchange); // ★ 一覧へ戻します。
                 return;
@@ -150,6 +250,11 @@ public class App {
                     deleteTodo(id); // ★ DELETEを呼びます。
                 }
                 redirect(exchange); // ★ 一覧へ戻します。
+                return;
+            }
+            if (path.equals("/delete-completed") && method.equals("POST")) { // 一括削除ボタンを処理します。
+                deleteCompletedTodos(); // DB内の完了済みだけを削除します。
+                redirect(exchange); // 更新後の件数を表示します。
                 return;
             }
             if (path.equals("/") && method.equals("GET")) { // ★ 一覧ページを表示します。
@@ -176,18 +281,102 @@ public class App {
     }
 
     private static String page() throws SQLException { // ★ DBの一覧からHTMLを作ります。
-        StringBuilder html = new StringBuilder(
-                "<form method='post' action='/add'><input name='todo'><button>追加</button></form><ul>"); // ★ 入力欄を作ります。
-        for (DbTodo todo : selectTodos()) { // ★ SELECTの結果を1件ずつ表示します。
-            html.append("<li>").append(escapeHtml(todo.getTitle())); // ★ タイトルを安全に表示します。
-            if (todo.isDone()) { // ★ 完了したTodoを調べます。
-                html.append(" ✔"); // ★ 完了マークを付けます。
+        List<DbTodo> todos = selectTodos(); // 表示と集計に使うTodoを1回だけ読みます。
+        long pageNow = System.currentTimeMillis(); // 画面を作った時刻をタイマーの基準にします。
+        int notStartedCount = 0;
+        int inProgressCount = 0;
+        int doneCount = 0;
+        for (DbTodo todo : todos) { // 状態ごとの件数を数えます。
+            if (todo.getStatus() == TodoStatus.NOT_STARTED) {
+                notStartedCount++;
+            } else if (todo.getStatus() == TodoStatus.IN_PROGRESS) {
+                inProgressCount++;
+            } else {
+                doneCount++;
             }
-            html.append(" <a href='/done?id=").append(todo.getId())
-                    .append("'>完了</a> <a href='/delete?id=").append(todo.getId())
-                    .append("'>削除</a></li>"); // ★ 操作リンクにDBのIDを入れます。
         }
-        return html.append("</ul>").toString(); // ★ 一覧を閉じて返します。
+        StringBuilder html = new StringBuilder(
+                "<style>.working{background:#fff2b3;padding:0 .2em}"
+                        + ".action-form{display:inline}"
+                        + ".table-wrap{overflow-x:auto}"
+                        + "table{border-collapse:collapse;margin-top:1em}"
+                        + "th,td{padding:.35em .65em;text-align:left;vertical-align:middle}"
+                        + "th{border-bottom:1px solid #bbb}"
+                        + ".start-time,.timer{white-space:nowrap}"
+                        + ".start-time{color:#555}"
+                        + ".timer{font-variant-numeric:tabular-nums;text-align:right}</style>"
+                        + "<h1>Todoリスト</h1>"); // 見出しと作業中の色を用意します。
+        html.append("<p>合計 ").append(todos.size()).append("件｜未着手 ")
+                .append(notStartedCount).append("件｜作業中 ").append(inProgressCount)
+                .append("件｜完了 ").append(doneCount).append("件</p>"); // 見出しの下に件数を表示します。
+        html.append("<form method='post' action='/add'><input name='todo'>")
+                .append("<button>追加</button></form>"); // 入力欄を表示します。
+        html.append("<form method='post' action='/delete-completed' ")
+                .append("onsubmit=\"return confirm('完了済みのTodoをすべて削除しますか？')\">")
+                .append("<button type='submit'"); // 押したときだけ確認を出します。
+        if (doneCount == 0) {
+            html.append(" disabled"); // 対象がないときは押せないようにします。
+        }
+        html.append(">完了済みを一括削除</button></form>");
+        html.append("<div class='table-wrap'><table><thead><tr>")
+                .append("<th>開始日時</th><th>Todo</th><th>経過時間</th>")
+                .append("<th>状態・操作</th><th></th></tr></thead><tbody>");
+        for (DbTodo todo : todos) { // 同じ一覧を1件ずつ表示します。
+            html.append("<tr><td class='start-time'>");
+            if (todo.getStartedAt() != null) {
+                html.append(START_FORMAT.format(Instant.ofEpochMilli(todo.getStartedAt())));
+            }
+            html.append("</td><td>"); // 開始日時をタイトルの左に置きます。
+            if (todo.getStatus() == TodoStatus.IN_PROGRESS) {
+                html.append("<span class='working'>"); // 作業中だけ薄いマーカーを付けます。
+            }
+            html.append(escapeHtml(todo.getTitle())); // タイトルを安全に表示します。
+            if (todo.getStatus() == TodoStatus.IN_PROGRESS) {
+                html.append("</span>");
+            }
+            html.append("</td><td class='timer'");
+            if (todo.getStatus() == TodoStatus.IN_PROGRESS && todo.getStartedAt() != null) {
+                html.append(" data-start='").append(todo.getStartedAt()).append("'");
+            }
+            html.append(">"); // 経過時間をタイトルの右に置きます。
+            if (todo.getStartedAt() != null) {
+                if (todo.getStatus() == TodoStatus.IN_PROGRESS) {
+                    html.append(formatElapsed(pageNow - todo.getStartedAt()));
+                } else if (todo.getStatus() == TodoStatus.DONE && todo.getCompletedAt() != null) {
+                    html.append(formatElapsed(todo.getCompletedAt() - todo.getStartedAt()));
+                }
+            }
+            html.append("</td><td>");
+            if (todo.getStatus() == TodoStatus.NOT_STARTED) {
+                html.append("<form class='action-form' method='post' action='/start?id=")
+                        .append(todo.getId()).append("'><button>開始</button></form>");
+            } else if (todo.getStatus() == TodoStatus.IN_PROGRESS) {
+                html.append("<small>作業中</small> ");
+                html.append("<form class='action-form' method='post' action='/done?id=")
+                        .append(todo.getId()).append("'><button>完了</button></form>");
+            } else {
+                html.append("✔"); // 完了後はマーカーと操作ボタンを出しません。
+            }
+            html.append("</td><td><a href='/delete?id=").append(todo.getId())
+                    .append("'>削除</a></td></tr>"); // 削除リンクはどの状態でも使えます。
+        }
+        html.append("</tbody></table></div><script>const serverNow=").append(pageNow)
+                .append(";const openedAt=performance.now();")
+                .append("function updateTimers(){const now=serverNow+(performance.now()-openedAt);")
+                .append("document.querySelectorAll('.timer[data-start]').forEach(el=>{")
+                .append("const seconds=Math.max(0,Math.floor((now-Number(el.dataset.start))/1000));")
+                .append("const hours=Math.floor(seconds/3600);")
+                .append("const minutes=Math.floor(seconds%3600/60);const rest=seconds%60;")
+                .append("el.textContent=String(hours).padStart(2,'0')+':'")
+                .append("+String(minutes).padStart(2,'0')+':'")
+                .append("+String(rest).padStart(2,'0');});}")
+                .append("updateTimers();setInterval(updateTimers,1000);</script>"); // 作業中だけ毎秒更新します。
+        return html.toString();
+    }
+
+    private static String formatElapsed(long elapsedMillis) { // 経過時間を時:分:秒にします。
+        long seconds = Math.max(0, elapsedMillis / 1000);
+        return String.format("%02d:%02d:%02d", seconds / 3600, (seconds / 60) % 60, seconds % 60);
     }
 
     private static String escapeHtml(String value) { // ★ タイトルをHTMLとして解釈させません。
