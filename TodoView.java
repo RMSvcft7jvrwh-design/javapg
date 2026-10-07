@@ -6,6 +6,68 @@ import java.util.List;
 class TodoView {
     private static final DateTimeFormatter START_FORMAT = DateTimeFormatter
             .ofPattern("yyyy/MM/dd HH:mm").withZone(ZoneId.systemDefault());
+    private static final String PAGE_STYLE = "<style>"
+            + "*{box-sizing:border-box}"
+            + "body{margin:0;background:#f5f7fb;color:#263346;"
+            + "font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}"
+            + ".page{max-width:1040px;margin:0 auto;padding:32px 20px 56px}"
+            + "h1,h2,p{margin-top:0}"
+            + "h1{font-size:1.8rem;letter-spacing:.02em;margin-bottom:4px}"
+            + "h2{font-size:1.15rem;margin:0}"
+            + ".subtitle{color:#617084;margin-bottom:0}"
+            + ".summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));"
+            + "gap:12px;margin:24px 0}"
+            + ".summary-card,.panel{background:#fff;border:1px solid #e1e7ef;"
+            + "border-radius:12px;box-shadow:0 2px 8px #1d35570a}"
+            + ".summary-card{padding:14px 18px}"
+            + ".summary-label{display:block;color:#617084;font-size:.85rem}"
+            + ".summary-value{display:block;font-size:1.5rem;font-weight:700;line-height:1.3}"
+            + ".panel{padding:20px;margin-bottom:18px}"
+            + ".add-form label{display:block;font-weight:600;margin-bottom:10px}"
+            + ".add-controls{display:flex;gap:10px}"
+            + ".add-controls input{flex:1;min-width:0;padding:10px 12px;border:1px solid #b9c5d4;"
+            + "border-radius:8px;font:inherit}"
+            + ".add-controls input:focus-visible,.button:focus-visible{outline:3px solid #a9c9ff;"
+            + "outline-offset:2px}"
+            + ".button{display:inline-flex;align-items:center;justify-content:center;min-height:40px;"
+            + "padding:8px 14px;border:1px solid #c9d3df;border-radius:8px;background:#fff;"
+            + "color:#263346;font:inherit;font-weight:600;text-decoration:none;cursor:pointer;"
+            + "white-space:nowrap}"
+            + ".button:hover{background:#f1f5fa}"
+            + ".button--primary{background:#2458a6;border-color:#2458a6;color:#fff}"
+            + ".button--primary:hover{background:#1a478d}"
+            + ".button--danger{color:#a1333a;border-color:#e7b8bc}"
+            + ".button--danger:hover{background:#fff1f2}"
+            + ".button--small{min-height:34px;padding:5px 10px;font-size:.9rem}"
+            + ".button:disabled{opacity:.5;cursor:not-allowed}"
+            + ".list-header{display:flex;align-items:center;justify-content:space-between;"
+            + "gap:12px;margin-bottom:16px}"
+            + ".table-wrap{width:100%;overflow-x:auto}"
+            + "table{width:100%;min-width:700px;border-collapse:collapse}"
+            + "th,td{padding:12px 10px;text-align:left;vertical-align:middle}"
+            + "th{background:#f4f7fb;color:#506176;font-size:.85rem;white-space:nowrap}"
+            + "tbody tr+tr td{border-top:1px solid #e9edf3}"
+            + "tbody tr:hover{background:#fafcff}"
+            + ".title-cell{min-width:170px;font-weight:600;overflow-wrap:anywhere}"
+            + ".working{background:#fff3cf;padding:2px 4px;border-radius:4px}"
+            + ".start-time,.timer{white-space:nowrap;color:#536276}"
+            + ".timer{font-variant-numeric:tabular-nums}"
+            + ".state-cell{min-width:190px}"
+            + ".row-actions{display:flex;align-items:center;gap:8px}"
+            + ".status{display:inline-flex;padding:4px 9px;border-radius:999px;"
+            + "font-size:.8rem;font-weight:700;white-space:nowrap}"
+            + ".status--new{background:#edf1f6;color:#44546a}"
+            + ".status--working{background:#fff1cc;color:#775600}"
+            + ".status--done{background:#dcf5e7;color:#17633b}"
+            + ".action-form{margin:0}"
+            + ".empty-state{text-align:center;color:#617084;padding:28px 10px}"
+            + "@media(max-width:640px){.page{padding:20px 14px 40px}"
+            + "h1{font-size:1.5rem}.summary{grid-template-columns:repeat(2,minmax(0,1fr));"
+            + "gap:8px;margin:18px 0}.summary-card{padding:12px}"
+            + ".panel{padding:14px}.add-controls{flex-direction:column}"
+            + ".list-header{align-items:stretch;flex-direction:column}"
+            + ".list-header .button{width:100%}}"
+            + "</style>";
 
     String page(List<DbTodo> todos) { // 渡されたTodo一覧からHTMLを作ります。
         long pageNow = System.currentTimeMillis(); // 画面を作った時刻をタイマーの基準にします。
@@ -22,41 +84,53 @@ class TodoView {
             }
         }
         StringBuilder html = new StringBuilder(
-                "<style>.working{background:#fff2b3;padding:0 .2em}"
-                        + ".action-form{display:inline}"
-                        + ".table-wrap{overflow-x:auto}"
-                        + "table{border-collapse:collapse;margin-top:1em}"
-                        + "th,td{padding:.35em .65em;text-align:left;vertical-align:middle}"
-                        + "th{border-bottom:1px solid #bbb}"
-                        + ".start-time,.timer{white-space:nowrap}"
-                        + ".start-time{color:#555}"
-                        + ".timer{font-variant-numeric:tabular-nums;text-align:right}</style>"
-                        + "<h1>Todoリスト</h1>"); // 見出しと作業中の色を用意します。
-        html.append("<p>合計 ").append(todos.size()).append("件｜未着手 ")
-                .append(notStartedCount).append("件｜作業中 ").append(inProgressCount)
-                .append("件｜完了 ").append(doneCount).append("件</p>"); // 見出しの下に件数を表示します。
-        html.append("<form method='post' action='/add'><input name='todo'>")
-                .append("<button>追加</button></form>"); // 入力欄を表示します。
-        html.append("<form method='post' action='/delete-completed' ")
+                "<!doctype html><html lang='ja'><head><meta charset='UTF-8'>"
+                        + "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+                        + "<title>Todoリスト</title>");
+        html.append(PAGE_STYLE).append("</head><body><main class='page'>")
+                .append("<header><h1>Todoリスト</h1>")
+                .append("<p class='subtitle'>やることと進み具合をまとめて確認できます。</p></header>");
+        html.append("<section class='summary' aria-label='Todoの件数'>")
+                .append("<div class='summary-card'><span class='summary-label'>合計</span>")
+                .append("<span class='summary-value'>").append(todos.size()).append("</span></div>")
+                .append("<div class='summary-card'><span class='summary-label'>未着手</span>")
+                .append("<span class='summary-value'>").append(notStartedCount).append("</span></div>")
+                .append("<div class='summary-card'><span class='summary-label'>作業中</span>")
+                .append("<span class='summary-value'>").append(inProgressCount).append("</span></div>")
+                .append("<div class='summary-card'><span class='summary-label'>完了</span>")
+                .append("<span class='summary-value'>").append(doneCount).append("</span></div></section>");
+        html.append("<section class='panel'><form class='add-form' method='post' action='/add'>")
+                .append("<label for='todo-title'>新しいTodo</label><div class='add-controls'>")
+                .append("<input id='todo-title' name='todo' placeholder='やることを入力'>")
+                .append("<button class='button button--primary' type='submit'>追加</button>")
+                .append("</div></form></section>");
+        html.append("<section class='panel'><div class='list-header'><h2>一覧</h2>")
+                .append("<form method='post' action='/delete-completed' ")
                 .append("onsubmit=\"return confirm('完了済みのTodoをすべて削除しますか？')\">")
-                .append("<button type='submit'"); // 押したときだけ確認を出します。
+                .append("<button class='button button--danger' type='submit'");
         if (doneCount == 0) {
-            html.append(" disabled"); // 対象がないときは押せないようにします。
+            html.append(" disabled");
         }
-        html.append(">完了済みを一括削除</button></form>");
+        html.append(">完了済みを一括削除</button></form></div>");
         html.append("<div class='table-wrap'><table><thead><tr>")
-                .append("<th>開始日時</th><th>Todo</th><th>経過時間</th>")
-                .append("<th>状態・操作</th><th></th></tr></thead><tbody>");
-        for (DbTodo todo : todos) { // 同じ一覧を1件ずつ表示します。
+                .append("<th scope='col'>開始日時</th><th scope='col'>Todo</th>")
+                .append("<th scope='col'>経過時間</th><th scope='col'>状態・操作</th>")
+                .append("<th scope='col'>削除</th></tr></thead><tbody>");
+        if (todos.isEmpty()) {
+            html.append("<tr><td class='empty-state' colspan='5'>Todoはまだありません。</td></tr>");
+        }
+        for (DbTodo todo : todos) {
             html.append("<tr><td class='start-time'>");
             if (todo.getStartedAt() != null) {
                 html.append(START_FORMAT.format(Instant.ofEpochMilli(todo.getStartedAt())));
+            } else {
+                html.append("—");
             }
-            html.append("</td><td>"); // 開始日時をタイトルの左に置きます。
+            html.append("</td><td class='title-cell'>");
             if (todo.getStatus() == TodoStatus.IN_PROGRESS) {
-                html.append("<span class='working'>"); // 作業中だけ薄いマーカーを付けます。
+                html.append("<span class='working'>");
             }
-            html.append(escapeHtml(todo.getTitle())); // タイトルを安全に表示します。
+            html.append(escapeHtml(todo.getTitle()));
             if (todo.getStatus() == TodoStatus.IN_PROGRESS) {
                 html.append("</span>");
             }
@@ -64,29 +138,34 @@ class TodoView {
             if (todo.getStatus() == TodoStatus.IN_PROGRESS && todo.getStartedAt() != null) {
                 html.append(" data-start='").append(todo.getStartedAt()).append("'");
             }
-            html.append(">"); // 経過時間をタイトルの右に置きます。
+            html.append(">");
             if (todo.getStartedAt() != null) {
                 if (todo.getStatus() == TodoStatus.IN_PROGRESS) {
                     html.append(formatElapsed(pageNow - todo.getStartedAt()));
                 } else if (todo.getStatus() == TodoStatus.DONE && todo.getCompletedAt() != null) {
                     html.append(formatElapsed(todo.getCompletedAt() - todo.getStartedAt()));
                 }
-            }
-            html.append("</td><td>");
-            if (todo.getStatus() == TodoStatus.NOT_STARTED) {
-                html.append("<form class='action-form' method='post' action='/start?id=")
-                        .append(todo.getId()).append("'><button>開始</button></form>");
-            } else if (todo.getStatus() == TodoStatus.IN_PROGRESS) {
-                html.append("<small>作業中</small> ");
-                html.append("<form class='action-form' method='post' action='/done?id=")
-                        .append(todo.getId()).append("'><button>完了</button></form>");
             } else {
-                html.append("✔"); // 完了後はマーカーと操作ボタンを出しません。
+                html.append("—");
             }
-            html.append("</td><td><a href='/delete?id=").append(todo.getId())
-                    .append("'>削除</a></td></tr>"); // 削除リンクはどの状態でも使えます。
+            html.append("</td><td class='state-cell'><div class='row-actions'>");
+            if (todo.getStatus() == TodoStatus.NOT_STARTED) {
+                html.append("<span class='status status--new'>未着手</span>");
+                html.append("<form class='action-form' method='post' action='/start?id=")
+                        .append(todo.getId())
+                        .append("'><button class='button button--primary button--small' type='submit'>開始</button></form>");
+            } else if (todo.getStatus() == TodoStatus.IN_PROGRESS) {
+                html.append("<span class='status status--working'>作業中</span>");
+                html.append("<form class='action-form' method='post' action='/done?id=")
+                        .append(todo.getId())
+                        .append("'><button class='button button--primary button--small' type='submit'>完了</button></form>");
+            } else {
+                html.append("<span class='status status--done'>完了</span>");
+            }
+            html.append("</div></td><td><a class='button button--danger button--small' href='/delete?id=")
+                    .append(todo.getId()).append("'>削除</a></td></tr>");
         }
-        html.append("</tbody></table></div><script>const serverNow=").append(pageNow)
+        html.append("</tbody></table></div></section></main><script>const serverNow=").append(pageNow)
                 .append(";const openedAt=performance.now();")
                 .append("function updateTimers(){const now=serverNow+(performance.now()-openedAt);")
                 .append("document.querySelectorAll('.timer[data-start]').forEach(el=>{")
@@ -96,7 +175,7 @@ class TodoView {
                 .append("el.textContent=String(hours).padStart(2,'0')+':'")
                 .append("+String(minutes).padStart(2,'0')+':'")
                 .append("+String(rest).padStart(2,'0');});}")
-                .append("updateTimers();setInterval(updateTimers,1000);</script>"); // 作業中だけ毎秒更新します。
+                .append("updateTimers();setInterval(updateTimers,1000);</script></body></html>");
         return html.toString();
     }
 
