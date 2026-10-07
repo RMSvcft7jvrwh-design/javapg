@@ -9,7 +9,7 @@ public class App {
         TodoView view = new TodoView();
         TodoHandler handler = new TodoHandler(repository, view);
 
-        HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 8080), 0);
         server.createContext("/", handler::handle);
         server.createContext("/api/todos", handler::handleApiTodos);
         server.start();
