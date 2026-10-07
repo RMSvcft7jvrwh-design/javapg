@@ -1,4 +1,4 @@
-class DbTodo { // ★ Main.javaのTodoと名前が重ならないようにします。
+class DbTodo { // SQLiteから読み込んだTodo1件を表します。
     private final int id;
     private final String title;
     private final TodoStatus status; // DBから読み取った進行状態を保持します。
