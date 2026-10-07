@@ -1,4 +1,5 @@
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -6,6 +7,9 @@ import java.util.List;
 class TodoView {
     private static final DateTimeFormatter START_FORMAT = DateTimeFormatter
             .ofPattern("yyyy/MM/dd HH:mm").withZone(ZoneId.systemDefault());
+    private static final DateTimeFormatter DUE_FORMAT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+    private static final DateTimeFormatter CLOCK_FORMAT = DateTimeFormatter
+            .ofPattern("yyyy/MM/dd HH:mm:ss").withZone(ZoneId.systemDefault());
     private static final String PAGE_STYLE = "<style>"
             + "*{box-sizing:border-box}"
             + "body{margin:0;background:#f5f7fb;color:#263346;"
@@ -15,6 +19,9 @@ class TodoView {
             + "h1{font-size:1.8rem;letter-spacing:.02em;margin-bottom:4px}"
             + "h2{font-size:1.15rem;margin:0}"
             + ".subtitle{color:#617084;margin-bottom:0}"
+            + ".page-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}"
+            + ".clock{display:block;padding:8px 12px;border:1px solid #e1e7ef;border-radius:8px;"
+            + "background:#fff;color:#536276;white-space:nowrap;font-variant-numeric:tabular-nums}"
             + ".summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));"
             + "gap:12px;margin:24px 0}"
             + ".summary-card,.panel{background:#fff;border:1px solid #e1e7ef;"
@@ -24,9 +31,11 @@ class TodoView {
             + ".summary-value{display:block;font-size:1.5rem;font-weight:700;line-height:1.3}"
             + ".panel{padding:20px;margin-bottom:18px}"
             + ".add-form label{display:block;font-weight:600;margin-bottom:10px}"
-            + ".add-controls{display:flex;gap:10px}"
+            + ".add-controls{display:flex;align-items:flex-end;gap:10px}"
             + ".add-controls input{flex:1;min-width:0;padding:10px 12px;border:1px solid #b9c5d4;"
             + "border-radius:8px;font:inherit}"
+            + ".due-field{display:flex;flex-direction:column;gap:4px;color:#617084;font-size:.8rem}"
+            + ".due-field input{width:180px;color:#263346}"
             + ".add-controls input:focus-visible,.button:focus-visible{outline:3px solid #a9c9ff;"
             + "outline-offset:2px}"
             + ".button{display:inline-flex;align-items:center;justify-content:center;min-height:40px;"
@@ -42,8 +51,14 @@ class TodoView {
             + ".button:disabled{opacity:.5;cursor:not-allowed}"
             + ".list-header{display:flex;align-items:center;justify-content:space-between;"
             + "gap:12px;margin-bottom:16px}"
+            + ".filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}"
+            + ".filter{padding:6px 12px;border:1px solid #d5dfea;border-radius:999px;"
+            + "color:#44546a;text-decoration:none;font-size:.9rem}"
+            + ".filter:hover{background:#f1f5fa}"
+            + ".filter--active{background:#2458a6;border-color:#2458a6;color:#fff}"
+            + ".filter--active:hover{background:#1a478d}"
             + ".table-wrap{width:100%;overflow-x:auto}"
-            + "table{width:100%;min-width:700px;border-collapse:collapse}"
+            + "table{width:100%;min-width:820px;border-collapse:collapse}"
             + "th,td{padding:12px 10px;text-align:left;vertical-align:middle}"
             + "th{background:#f4f7fb;color:#506176;font-size:.85rem;white-space:nowrap}"
             + "tbody tr+tr td{border-top:1px solid #e9edf3}"
@@ -51,6 +66,8 @@ class TodoView {
             + ".title-cell{min-width:170px;font-weight:600;overflow-wrap:anywhere}"
             + ".working{background:#fff3cf;padding:2px 4px;border-radius:4px}"
             + ".start-time,.timer{white-space:nowrap;color:#536276}"
+            + ".due-date{white-space:nowrap}"
+            + ".due-date--overdue{color:#a1333a;font-weight:700}"
             + ".timer{font-variant-numeric:tabular-nums}"
             + ".state-cell{min-width:190px}"
             + ".row-actions{display:flex;align-items:center;gap:8px}"
@@ -62,15 +79,25 @@ class TodoView {
             + ".action-form{margin:0}"
             + ".empty-state{text-align:center;color:#617084;padding:28px 10px}"
             + "@media(max-width:640px){.page{padding:20px 14px 40px}"
+            + ".page-header{flex-direction:column}.clock{width:100%}"
             + "h1{font-size:1.5rem}.summary{grid-template-columns:repeat(2,minmax(0,1fr));"
             + "gap:8px;margin:18px 0}.summary-card{padding:12px}"
-            + ".panel{padding:14px}.add-controls{flex-direction:column}"
+            + ".panel{padding:14px}.add-controls{flex-direction:column;align-items:stretch}"
+            + ".due-field input{width:100%}"
             + ".list-header{align-items:stretch;flex-direction:column}"
             + ".list-header .button{width:100%}}"
             + "</style>";
 
-    String page(List<DbTodo> todos) { // 渡されたTodo一覧からHTMLを作ります。
+    String page(List<DbTodo> todos, String filter, LocalDate today) {
         long pageNow = System.currentTimeMillis(); // 画面を作った時刻をタイマーの基準にします。
+        String listTitle = "すべてのTodo";
+        if ("today".equals(filter)) {
+            listTitle = "今日のTodo";
+        } else if ("tomorrow".equals(filter)) {
+            listTitle = "明日のTodo";
+        } else if ("overdue".equals(filter)) {
+            listTitle = "期限切れのTodo";
+        }
         int notStartedCount = 0;
         int inProgressCount = 0;
         int doneCount = 0;
@@ -86,12 +113,15 @@ class TodoView {
         StringBuilder html = new StringBuilder(
                 "<!doctype html><html lang='ja'><head><meta charset='UTF-8'>"
                         + "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-                        + "<title>Todoリスト</title>");
+                        + "<title>今日のTodo</title>");
         html.append(PAGE_STYLE).append("</head><body><main class='page'>")
-                .append("<header><h1>Todoリスト</h1>")
-                .append("<p class='subtitle'>やることと進み具合をまとめて確認できます。</p></header>");
+                .append("<header class='page-header'><div><h1>今日のTodo</h1>")
+                .append("<p class='subtitle'>予定日と進み具合をまとめて確認できます。</p></div>")
+                .append("<time class='clock' id='current-time'>現在時刻 ")
+                .append(CLOCK_FORMAT.format(Instant.ofEpochMilli(pageNow)))
+                .append("</time></header>");
         html.append("<section class='summary' aria-label='Todoの件数'>")
-                .append("<div class='summary-card'><span class='summary-label'>合計</span>")
+                .append("<div class='summary-card'><span class='summary-label'>表示中</span>")
                 .append("<span class='summary-value'>").append(todos.size()).append("</span></div>")
                 .append("<div class='summary-card'><span class='summary-label'>未着手</span>")
                 .append("<span class='summary-value'>").append(notStartedCount).append("</span></div>")
@@ -102,22 +132,36 @@ class TodoView {
         html.append("<section class='panel'><form class='add-form' method='post' action='/add'>")
                 .append("<label for='todo-title'>新しいTodo</label><div class='add-controls'>")
                 .append("<input id='todo-title' name='todo' placeholder='やることを入力'>")
+                .append("<label class='due-field' for='due-date'><span>予定日（任意）</span>")
+                .append("<input id='due-date' name='dueDate' type='date'></label>")
                 .append("<button class='button button--primary' type='submit'>追加</button>")
                 .append("</div></form></section>");
-        html.append("<section class='panel'><div class='list-header'><h2>一覧</h2>")
-                .append("<form method='post' action='/delete-completed' ")
-                .append("onsubmit=\"return confirm('完了済みのTodoをすべて削除しますか？')\">")
-                .append("<button class='button button--danger' type='submit'");
-        if (doneCount == 0) {
-            html.append(" disabled");
+        html.append("<section class='panel'><div class='list-header'><h2>")
+                .append(listTitle).append("</h2>");
+        if ("all".equals(filter)) {
+            html.append("<form method='post' action='/delete-completed' ")
+                    .append("onsubmit=\"return confirm('完了済みのTodoをすべて削除しますか？')\">")
+                    .append("<button class='button button--danger' type='submit'");
+            if (doneCount == 0) {
+                html.append(" disabled");
+            }
+            html.append(">完了済みを一括削除</button></form>");
         }
-        html.append(">完了済みを一括削除</button></form></div>");
+        html.append("</div><nav class='filters' aria-label='予定日で絞り込み'>");
+        appendFilterLink(html, "all", "すべて", filter);
+        appendFilterLink(html, "today", "今日", filter);
+        appendFilterLink(html, "tomorrow", "明日", filter);
+        appendFilterLink(html, "overdue", "期限切れ", filter);
+        html.append("</nav>");
         html.append("<div class='table-wrap'><table><thead><tr>")
                 .append("<th scope='col'>開始日時</th><th scope='col'>Todo</th>")
-                .append("<th scope='col'>経過時間</th><th scope='col'>状態・操作</th>")
+                .append("<th scope='col'>予定日</th><th scope='col'>経過時間</th>")
+                .append("<th scope='col'>状態・操作</th>")
                 .append("<th scope='col'>削除</th></tr></thead><tbody>");
         if (todos.isEmpty()) {
-            html.append("<tr><td class='empty-state' colspan='5'>Todoはまだありません。</td></tr>");
+            html.append("<tr><td class='empty-state' colspan='6'>")
+                    .append("all".equals(filter) ? "Todoはまだありません。" : "この条件のTodoはありません。")
+                    .append("</td></tr>");
         }
         for (DbTodo todo : todos) {
             html.append("<tr><td class='start-time'>");
@@ -133,6 +177,16 @@ class TodoView {
             html.append(escapeHtml(todo.getTitle()));
             if (todo.getStatus() == TodoStatus.IN_PROGRESS) {
                 html.append("</span>");
+            }
+            html.append("</td><td class='due-date");
+            if (todo.getDueDate() != null && todo.getDueDate().isBefore(today) && !todo.isDone()) {
+                html.append(" due-date--overdue");
+            }
+            html.append("'>");
+            if (todo.getDueDate() == null) {
+                html.append("—");
+            } else {
+                html.append(DUE_FORMAT.format(todo.getDueDate()));
             }
             html.append("</td><td class='timer'");
             if (todo.getStatus() == TodoStatus.IN_PROGRESS && todo.getStartedAt() != null) {
@@ -152,21 +206,29 @@ class TodoView {
             if (todo.getStatus() == TodoStatus.NOT_STARTED) {
                 html.append("<span class='status status--new'>未着手</span>");
                 html.append("<form class='action-form' method='post' action='/start?id=")
-                        .append(todo.getId())
+                        .append(todo.getId()).append("&amp;filter=").append(filter)
                         .append("'><button class='button button--primary button--small' type='submit'>開始</button></form>");
             } else if (todo.getStatus() == TodoStatus.IN_PROGRESS) {
                 html.append("<span class='status status--working'>作業中</span>");
                 html.append("<form class='action-form' method='post' action='/done?id=")
-                        .append(todo.getId())
+                        .append(todo.getId()).append("&amp;filter=").append(filter)
                         .append("'><button class='button button--primary button--small' type='submit'>完了</button></form>");
             } else {
                 html.append("<span class='status status--done'>完了</span>");
             }
             html.append("</div></td><td><a class='button button--danger button--small' href='/delete?id=")
-                    .append(todo.getId()).append("'>削除</a></td></tr>");
+                    .append(todo.getId()).append("&amp;filter=").append(filter)
+                    .append("'>削除</a></td></tr>");
         }
         html.append("</tbody></table></div></section></main><script>const serverNow=").append(pageNow)
                 .append(";const openedAt=performance.now();")
+                .append("const renderedDay='").append(today).append("';")
+                .append("function localDay(date){return date.getFullYear()+'-'")
+                .append("+String(date.getMonth()+1).padStart(2,'0')+'-'")
+                .append("+String(date.getDate()).padStart(2,'0');}")
+                .append("function updateClock(){const now=new Date();")
+                .append("document.getElementById('current-time').textContent='現在時刻 '+now.toLocaleString('ja-JP');")
+                .append("if(localDay(now)!==renderedDay){location.reload();}}")
                 .append("function updateTimers(){const now=serverNow+(performance.now()-openedAt);")
                 .append("document.querySelectorAll('.timer[data-start]').forEach(el=>{")
                 .append("const seconds=Math.max(0,Math.floor((now-Number(el.dataset.start))/1000));")
@@ -175,8 +237,21 @@ class TodoView {
                 .append("el.textContent=String(hours).padStart(2,'0')+':'")
                 .append("+String(minutes).padStart(2,'0')+':'")
                 .append("+String(rest).padStart(2,'0');});}")
-                .append("updateTimers();setInterval(updateTimers,1000);</script></body></html>");
+                .append("updateClock();updateTimers();")
+                .append("setInterval(()=>{updateClock();updateTimers();},1000);</script></body></html>");
         return html.toString();
+    }
+
+    private void appendFilterLink(StringBuilder html, String value, String label, String selected) {
+        html.append("<a class='filter");
+        if (value.equals(selected)) {
+            html.append(" filter--active");
+        }
+        html.append("' href='/?filter=").append(value).append("'");
+        if (value.equals(selected)) {
+            html.append(" aria-current='page'");
+        }
+        html.append(">").append(label).append("</a>");
     }
 
     private String formatElapsed(long elapsedMillis) { // 経過時間を時:分:秒にします。

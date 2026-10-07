@@ -3,6 +3,8 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 
 class TodoHandler {
     private final TodoRepository repository;
@@ -40,11 +42,20 @@ class TodoHandler {
             if (path.equals("/add") && method.equals("POST")) { // ★ フォームからの追加です。
                 String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8); // ★
                                                                                                             // 送信内容を読みます。
-                if (body.startsWith("todo=")) { // ★ フォームの項目名を確認します。
-                    String title = URLDecoder.decode(body.substring(5), StandardCharsets.UTF_8); // ★ タイトルを復元します。
-                    if (!title.isBlank()) { // ★ 空のタイトルは登録しません。
-                        repository.insertTodo(title); // ★ INSERTを呼びます。
+                try {
+                    String title = parameterValue(body, "todo");
+                    String dueDateText = parameterValue(body, "dueDate");
+                    if (title != null && !title.isBlank()) {
+                        LocalDate dueDate = dueDateText == null || dueDateText.isBlank()
+                                ? null : LocalDate.parse(dueDateText);
+                        repository.insertTodo(title, dueDate);
                     }
+                } catch (DateTimeParseException e) {
+                    send(exchange, 400, "text/plain", "予定日の形式が正しくありません");
+                    return;
+                } catch (IllegalArgumentException e) {
+                    send(exchange, 400, "text/plain", "入力の形式が正しくありません");
+                    return;
                 }
                 redirect(exchange); // ★ 一覧へ戻します。
                 return;
@@ -54,7 +65,7 @@ class TodoHandler {
                 if (id != null) {
                     repository.startTodo(id); // 未着手から作業中にします。
                 }
-                redirect(exchange);
+                redirect(exchange, requestedFilter(exchange));
                 return;
             }
             if (path.equals("/done") && method.equals("POST")) { // 完了ボタンを処理します。
@@ -62,7 +73,7 @@ class TodoHandler {
                 if (id != null) { // ★ 数字のIDだけを扱います。
                     repository.completeTodo(id); // 作業中から完了にします。
                 }
-                redirect(exchange); // ★ 一覧へ戻します。
+                redirect(exchange, requestedFilter(exchange));
                 return;
             }
             if (path.equals("/delete") && method.equals("GET")) { // ★ 削除リンクを処理します。
@@ -70,16 +81,19 @@ class TodoHandler {
                 if (id != null) { // ★ 数字のIDだけを扱います。
                     repository.deleteTodo(id); // ★ DELETEを呼びます。
                 }
-                redirect(exchange); // ★ 一覧へ戻します。
+                redirect(exchange, requestedFilter(exchange));
                 return;
             }
             if (path.equals("/delete-completed") && method.equals("POST")) { // 一括削除ボタンを処理します。
                 repository.deleteCompletedTodos(); // DB内の完了済みだけを削除します。
-                redirect(exchange); // 更新後の件数を表示します。
+                redirect(exchange, requestedFilter(exchange));
                 return;
             }
             if (path.equals("/") && method.equals("GET")) { // ★ 一覧ページを表示します。
-                send(exchange, 200, "text/html", view.page(repository.selectTodos())); // ★ SELECTした一覧を返します。
+                String filter = requestedFilter(exchange);
+                LocalDate today = LocalDate.now();
+                send(exchange, 200, "text/html",
+                        view.page(repository.selectTodos(filter, today), filter, today));
                 return;
             }
             send(exchange, 404, "text/plain", "ページが見つかりません"); // ★ 未知の場所は404にします。
@@ -90,15 +104,39 @@ class TodoHandler {
     }
 
     private Integer requestedId(HttpExchange exchange) { // ★ URLからIDを取り出します。
-        String query = exchange.getRequestURI().getQuery(); // ★ ?以降を読みます。
-        if (query == null || !query.startsWith("id=")) { // ★ ID指定がない場合です。
-            return null;
-        }
         try { // ★ 数字でないIDに備えます。
-            return Integer.parseInt(query.substring(3)); // ★ 数字に変換します。
-        } catch (NumberFormatException e) { // ★ 変換できない場合です。
+            String id = parameterValue(exchange.getRequestURI().getRawQuery(), "id");
+            return id == null ? null : Integer.parseInt(id);
+        } catch (IllegalArgumentException e) {
             return null;
         }
+    }
+
+    private String requestedFilter(HttpExchange exchange) {
+        try {
+            String filter = parameterValue(exchange.getRequestURI().getRawQuery(), "filter");
+            if ("today".equals(filter) || "tomorrow".equals(filter) || "overdue".equals(filter)) {
+                return filter;
+            }
+        } catch (IllegalArgumentException e) {
+            // 不正な指定は全件表示に戻します。
+        }
+        return "all";
+    }
+
+    private String parameterValue(String encoded, String name) {
+        if (encoded == null) {
+            return null;
+        }
+        for (String part : encoded.split("&")) {
+            int equals = part.indexOf('=');
+            String key = equals < 0 ? part : part.substring(0, equals);
+            if (name.equals(URLDecoder.decode(key, StandardCharsets.UTF_8))) {
+                String value = equals < 0 ? "" : part.substring(equals + 1);
+                return URLDecoder.decode(value, StandardCharsets.UTF_8);
+            }
+        }
+        return null;
     }
 
     private void sendJson(HttpExchange exchange, int status, String message) throws IOException { // JSONを返します。
@@ -111,7 +149,12 @@ class TodoHandler {
     } // JSON応答処理を終えます。
 
     private void redirect(HttpExchange exchange) throws IOException { // ★ 操作後に一覧へ戻します。
-        exchange.getResponseHeaders().set("Location", "/"); // ★ 戻り先を指定します。
+        redirect(exchange, "all");
+    }
+
+    private void redirect(HttpExchange exchange, String filter) throws IOException {
+        String location = "all".equals(filter) ? "/" : "/?filter=" + filter;
+        exchange.getResponseHeaders().set("Location", location);
         exchange.sendResponseHeaders(303, -1); // ★ ブラウザに再表示を指示します。
         exchange.close(); // ★ 通信を閉じます。
     }
