@@ -10,83 +10,6 @@ class TodoView {
     private static final DateTimeFormatter DUE_FORMAT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     private static final DateTimeFormatter CLOCK_FORMAT = DateTimeFormatter
             .ofPattern("yyyy/MM/dd HH:mm:ss").withZone(ZoneId.systemDefault());
-    private static final String PAGE_STYLE = "<style>"
-            + "*{box-sizing:border-box}"
-            + "body{margin:0;background:#f5f7fb;color:#263346;"
-            + "font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}"
-            + ".page{max-width:1040px;margin:0 auto;padding:32px 20px 56px}"
-            + "h1,h2,p{margin-top:0}"
-            + "h1{font-size:1.8rem;letter-spacing:.02em;margin-bottom:4px}"
-            + "h2{font-size:1.15rem;margin:0}"
-            + ".subtitle{color:#617084;margin-bottom:0}"
-            + ".page-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}"
-            + ".clock{display:block;padding:8px 12px;border:1px solid #e1e7ef;border-radius:8px;"
-            + "background:#fff;color:#536276;white-space:nowrap;font-variant-numeric:tabular-nums}"
-            + ".summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));"
-            + "gap:12px;margin:24px 0}"
-            + ".summary-card,.panel{background:#fff;border:1px solid #e1e7ef;"
-            + "border-radius:12px;box-shadow:0 2px 8px #1d35570a}"
-            + ".summary-card{padding:14px 18px}"
-            + ".summary-label{display:block;color:#617084;font-size:.85rem}"
-            + ".summary-value{display:block;font-size:1.5rem;font-weight:700;line-height:1.3}"
-            + ".panel{padding:20px;margin-bottom:18px}"
-            + ".add-form label{display:block;font-weight:600;margin-bottom:10px}"
-            + ".add-controls{display:flex;align-items:flex-end;gap:10px}"
-            + ".add-controls input{flex:1;min-width:0;padding:10px 12px;border:1px solid #b9c5d4;"
-            + "border-radius:8px;font:inherit}"
-            + ".due-field{display:flex;flex-direction:column;gap:4px;color:#617084;font-size:.8rem}"
-            + ".due-field input{width:180px;color:#263346}"
-            + ".add-controls input:focus-visible,.button:focus-visible{outline:3px solid #a9c9ff;"
-            + "outline-offset:2px}"
-            + ".button{display:inline-flex;align-items:center;justify-content:center;min-height:40px;"
-            + "padding:8px 14px;border:1px solid #c9d3df;border-radius:8px;background:#fff;"
-            + "color:#263346;font:inherit;font-weight:600;text-decoration:none;cursor:pointer;"
-            + "white-space:nowrap}"
-            + ".button:hover{background:#f1f5fa}"
-            + ".button--primary{background:#2458a6;border-color:#2458a6;color:#fff}"
-            + ".button--primary:hover{background:#1a478d}"
-            + ".button--danger{color:#a1333a;border-color:#e7b8bc}"
-            + ".button--danger:hover{background:#fff1f2}"
-            + ".button--small{min-height:34px;padding:5px 10px;font-size:.9rem}"
-            + ".button:disabled{opacity:.5;cursor:not-allowed}"
-            + ".list-header{display:flex;align-items:center;justify-content:space-between;"
-            + "gap:12px;margin-bottom:16px}"
-            + ".filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}"
-            + ".filter{padding:6px 12px;border:1px solid #d5dfea;border-radius:999px;"
-            + "color:#44546a;text-decoration:none;font-size:.9rem}"
-            + ".filter:hover{background:#f1f5fa}"
-            + ".filter--active{background:#2458a6;border-color:#2458a6;color:#fff}"
-            + ".filter--active:hover{background:#1a478d}"
-            + ".table-wrap{width:100%;overflow-x:auto}"
-            + "table{width:100%;min-width:820px;border-collapse:collapse}"
-            + "th,td{padding:12px 10px;text-align:left;vertical-align:middle}"
-            + "th{background:#f4f7fb;color:#506176;font-size:.85rem;white-space:nowrap}"
-            + "tbody tr+tr td{border-top:1px solid #e9edf3}"
-            + "tbody tr:hover{background:#fafcff}"
-            + ".title-cell{min-width:170px;font-weight:600;overflow-wrap:anywhere}"
-            + ".working{background:#fff3cf;padding:2px 4px;border-radius:4px}"
-            + ".start-time,.timer{white-space:nowrap;color:#536276}"
-            + ".due-date{white-space:nowrap}"
-            + ".due-date--overdue{color:#a1333a;font-weight:700}"
-            + ".timer{font-variant-numeric:tabular-nums}"
-            + ".state-cell{min-width:190px}"
-            + ".row-actions{display:flex;align-items:center;gap:8px}"
-            + ".status{display:inline-flex;padding:4px 9px;border-radius:999px;"
-            + "font-size:.8rem;font-weight:700;white-space:nowrap}"
-            + ".status--new{background:#edf1f6;color:#44546a}"
-            + ".status--working{background:#fff1cc;color:#775600}"
-            + ".status--done{background:#dcf5e7;color:#17633b}"
-            + ".action-form{margin:0}"
-            + ".empty-state{text-align:center;color:#617084;padding:28px 10px}"
-            + "@media(max-width:640px){.page{padding:20px 14px 40px}"
-            + ".page-header{flex-direction:column}.clock{width:100%}"
-            + "h1{font-size:1.5rem}.summary{grid-template-columns:repeat(2,minmax(0,1fr));"
-            + "gap:8px;margin:18px 0}.summary-card{padding:12px}"
-            + ".panel{padding:14px}.add-controls{flex-direction:column;align-items:stretch}"
-            + ".due-field input{width:100%}"
-            + ".list-header{align-items:stretch;flex-direction:column}"
-            + ".list-header .button{width:100%}}"
-            + "</style>";
 
     String page(List<DbTodo> todos, String filter, LocalDate today) {
         long pageNow = System.currentTimeMillis(); // 画面を作った時刻をタイマーの基準にします。
@@ -114,12 +37,19 @@ class TodoView {
                 "<!doctype html><html lang='ja'><head><meta charset='UTF-8'>"
                         + "<meta name='viewport' content='width=device-width, initial-scale=1'>"
                         + "<title>今日のTodo</title>");
-        html.append(PAGE_STYLE).append("</head><body><main class='page'>")
+        html.append("<link rel='stylesheet' href='/style.css'>")
+                .append("</head><body><main class='page'>")
                 .append("<header class='page-header'><div><h1>今日のTodo</h1>")
                 .append("<p class='subtitle'>予定日と進み具合をまとめて確認できます。</p></div>")
                 .append("<time class='clock' id='current-time'>現在時刻 ")
                 .append(CLOCK_FORMAT.format(Instant.ofEpochMilli(pageNow)))
-                .append("</time></header>");
+                .append("</time><svg class='kasumi' viewBox='0 0 380 96' preserveAspectRatio='xMaxYMax meet' ")
+                .append("aria-hidden='true' focusable='false'><g fill='none' stroke='currentColor' ")
+                .append("stroke-width='2' stroke-linecap='square' stroke-linejoin='miter'>")
+                .append("<path d='M8 25h72V13h78v12h52v11h72v10h90'/>")
+                .append("<path d='M42 47h70V35h84v12h58v12h106'/>")
+                .append("<path d='M0 70h90V58h76v12h82v12h114'/>")
+                .append("</g></svg></header>");
         html.append("<section class='summary' aria-label='Todoの件数'>")
                 .append("<div class='summary-card'><span class='summary-label'>表示中</span>")
                 .append("<span class='summary-value'>").append(todos.size()).append("</span></div>")
@@ -131,8 +61,8 @@ class TodoView {
                 .append("<span class='summary-value'>").append(doneCount).append("</span></div></section>");
         html.append("<section class='panel'><form class='add-form' method='post' action='/add'>")
                 .append("<label for='todo-title'>新しいTodo</label><div class='add-controls'>")
-                .append("<input id='todo-title' name='todo' placeholder='やることを入力'>")
-                .append("<label class='due-field' for='due-date'><span>予定日（任意）</span>")
+                .append("<input id='todo-title' name='todo' placeholder='やることを入力' autocomplete='off'>")
+                .append("<label class='due-field' for='due-date'><span>予定日（空欄なら今日）</span>")
                 .append("<input id='due-date' name='dueDate' type='date'></label>")
                 .append("<button class='button button--primary' type='submit'>追加</button>")
                 .append("</div></form></section>");
@@ -264,51 +194,4 @@ class TodoView {
                 .replace(">", "&gt;").replace("\"", "&quot;")
                 .replace("'", "&#39;"); // ★ 特殊文字を置き換えます。
     }
-
-    String todosJson(List<DbTodo> todos) { // 渡されたTodo一覧をJSON文字列にします。
-        StringBuilder json = new StringBuilder("["); // JSON配列を開始します。
-        boolean first = true; // 最初の要素かどうかを覚えます。
-        for (DbTodo todo : todos) { // 渡されたTodoを1件ずつ読み出します。
-            if (!first) { // 2件目以降か確認します。
-                json.append(','); // 要素間にカンマを入れます。
-            } // カンマの処理を終えます。
-            json.append("{\"title\":\"").append(escapeJson(todo.getTitle())) // タイトルをJSON用に変換します。
-                    .append("\",\"done\":").append(todo.isDone()).append('}'); // 完了状態を真偽値で加えます。
-            first = false; // 次の要素からカンマが必要です。
-        } // 全Todoの処理を終えます。
-        return json.append(']').toString(); // JSON配列を閉じます。
-    } // JSON文字列の作成を終えます。
-
-    private String escapeJson(String value) { // タイトル内の特殊文字をエスケープします。
-        StringBuilder escaped = new StringBuilder(); // 変換後の文字列を入れます。
-        for (int i = 0; i < value.length(); i++) { // 文字を1つずつ調べます。
-            char ch = value.charAt(i); // 現在の文字を取り出します。
-            switch (ch) { // 文字の種類で処理を分けます。
-                case '"':
-                    escaped.append("\\\"");
-                    break; // 二重引用符をエスケープします。
-                case '\\':
-                    escaped.append("\\\\");
-                    break; // バックスラッシュをエスケープします。
-                case '\n':
-                    escaped.append("\\n");
-                    break; // 改行をエスケープします。
-                case '\r':
-                    escaped.append("\\r");
-                    break; // 復帰をエスケープします。
-                case '\t':
-                    escaped.append("\\t");
-                    break; // タブをエスケープします。
-                default: // その他の文字を処理します。
-                    if (ch < 0x20) { // 残りの制御文字を確認します。
-                        escaped.append("\\u00"); // Unicode形式の先頭を付けます。
-                        escaped.append(Character.forDigit((ch >>> 4) & 0xf, 16)); // 上位1桁を付けます。
-                        escaped.append(Character.forDigit(ch & 0xf, 16)); // 下位1桁を付けます。
-                    } else { // 通常の文字の場合です。
-                        escaped.append(ch); // そのまま加えます。
-                    } // 制御文字の確認を終えます。
-            } // 文字種ごとの処理を終えます。
-        } // 全文字の処理を終えます。
-        return escaped.toString(); // エスケープ済み文字列を返します。
-    } // エスケープ処理を終えます。
 }

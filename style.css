@@ -1,0 +1,70 @@
+*{box-sizing:border-box}
+body{margin:0;background:#f5f7fb;color:#263346;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.page{max-width:1040px;margin:0 auto;padding:32px 20px 56px}
+h1,h2,p{margin-top:0}
+h1{font-size:1.8rem;letter-spacing:.02em;margin-bottom:4px}
+h2{font-size:1.15rem;margin:0}
+.subtitle{color:#617084;margin-bottom:0}
+.page-header{position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;min-height:120px;padding:8px 8px 24px;z-index:0;border-bottom:1px solid #dce7f2}
+.page-header>div,.page-header>.clock{position:relative;z-index:1}
+.kasumi{position:absolute;right:0;bottom:-102px;width:min(64vw,640px);height:160px;color:#4d78aa;opacity:.28;pointer-events:none}
+.clock{display:block;padding:8px 12px;border:1px solid #e1e7ef;border-radius:8px;background:#fff;color:#536276;white-space:nowrap;font-variant-numeric:tabular-nums}
+.summary{position:relative;z-index:1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:24px 0}
+.summary-card,.panel{background:#fff;border:1px solid #e1e7ef;border-radius:12px;box-shadow:0 2px 8px #1d35570a}
+.summary-card{display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:4px;aspect-ratio:1 / 1;padding:20px 24px;background:rgba(255,255,255,.18)}
+.summary-label{display:block;color:#617084;font-size:.9rem}
+.summary-value{display:block;font-size:2.15rem;font-weight:700;line-height:1.2}
+.panel{padding:20px;margin-bottom:18px}
+.add-form label{display:block;font-weight:600;margin-bottom:10px}
+.add-controls{display:flex;align-items:flex-end;gap:10px}
+.add-controls input{flex:1;min-width:0;padding:10px 12px;border:1px solid #b9c5d4;border-radius:8px;font:inherit}
+.due-field{display:flex;flex-direction:column;gap:4px;color:#617084;font-size:.8rem}
+.due-field input{width:180px;color:#263346}
+.add-controls input:focus-visible,.button:focus-visible{outline:3px solid #a9c9ff;outline-offset:2px}
+.button{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:8px 14px;border:1px solid #c9d3df;border-radius:8px;background:#fff;color:#263346;font:inherit;font-weight:600;text-decoration:none;cursor:pointer;white-space:nowrap}
+.button:hover{background:#f1f5fa}
+.button--primary{background:#2458a6;border-color:#2458a6;color:#fff}
+.button--primary:hover{background:#1a478d}
+.button--danger{color:#a1333a;border-color:#e7b8bc}
+.button--danger:hover{background:#fff1f2}
+.button--small{min-height:34px;padding:5px 10px;font-size:.9rem}
+.button:disabled{opacity:.5;cursor:not-allowed}
+.list-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.filter{padding:6px 12px;border:1px solid #d5dfea;border-radius:999px;color:#44546a;text-decoration:none;font-size:.9rem}
+.filter:hover{background:#f1f5fa}
+.filter--active{background:#2458a6;border-color:#2458a6;color:#fff}
+.filter--active:hover{background:#1a478d}
+.table-wrap{width:100%;overflow-x:auto}
+table{width:100%;min-width:820px;border-collapse:collapse}
+th,td{padding:12px 10px;text-align:left;vertical-align:middle}
+th{background:#f4f7fb;color:#506176;font-size:.85rem;white-space:nowrap}
+tbody tr+tr td{border-top:1px solid #e9edf3}
+tbody tr:hover{background:#fafcff}
+.title-cell{min-width:170px;font-weight:600;overflow-wrap:anywhere}
+.working{background:#fff3cf;padding:2px 4px;border-radius:4px}
+.start-time,.timer{white-space:nowrap;color:#536276}
+.due-date{white-space:nowrap}
+.due-date--overdue{color:#a1333a;font-weight:700}
+.timer{font-variant-numeric:tabular-nums}
+.state-cell{min-width:190px}
+.row-actions{display:flex;align-items:center;gap:8px}
+.status{display:inline-flex;padding:4px 9px;border-radius:999px;font-size:.8rem;font-weight:700;white-space:nowrap}
+.status--new{background:#edf1f6;color:#44546a}
+.status--working{background:#fff1cc;color:#775600}
+.status--done{background:#dcf5e7;color:#17633b}
+.action-form{margin:0}
+.empty-state{text-align:center;color:#617084;padding:28px 10px}
+@media(max-width:640px){.page{padding:20px 14px 40px}
+.page-header{flex-direction:column}
+.clock{width:100%}
+.kasumi{bottom:-88px;width:90%;height:128px;opacity:.22}
+h1{font-size:1.5rem}
+.summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:18px 0}
+.summary-card{padding:14px 16px}
+.panel{padding:14px}
+.add-controls{flex-direction:column;align-items:stretch}
+.due-field input{width:100%}
+.list-header{align-items:stretch;flex-direction:column}
+.list-header .button{width:100%}
+}

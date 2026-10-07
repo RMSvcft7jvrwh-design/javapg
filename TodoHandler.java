@@ -2,6 +2,8 @@ import com.sun.net.httpserver.HttpExchange;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -28,11 +30,30 @@ class TodoHandler {
             return; // 以降の処理を止めます。
         } // 通信方法の確認を終えます。
         try { // DBの読み込みエラーに備えます。
-            sendJson(exchange, 200, view.todosJson(repository.selectTodos())); // 全TodoをJSONで返します。
+            sendJson(exchange, 200, TodoJson.todosJson(repository.selectTodos())); // 全TodoをJSONで返します。
         } catch (SQLException e) { // DBの読み込みに失敗した場合です。
             e.printStackTrace(); // 詳細をサーバー側へ出します。
             sendJson(exchange, 500, "{\"error\":\"database error\"}"); // JSON形式でエラーを返します。
         } // DB処理を終えます。
+    }
+
+    void handleStyle(HttpExchange exchange) throws IOException {
+        if (!exchange.getRequestURI().getPath().equals("/style.css")) {
+            send(exchange, 404, "text/plain", "ページが見つかりません");
+            return;
+        }
+        if (!exchange.getRequestMethod().equals("GET")) {
+            exchange.getResponseHeaders().set("Allow", "GET");
+            exchange.sendResponseHeaders(405, -1);
+            exchange.close();
+            return;
+        }
+        Path stylesheet = Path.of("style.css");
+        if (!Files.isRegularFile(stylesheet)) {
+            send(exchange, 404, "text/plain", "スタイルが見つかりません");
+            return;
+        }
+        send(exchange, 200, "text/css", Files.readString(stylesheet, StandardCharsets.UTF_8));
     }
 
     void handle(HttpExchange exchange) throws IOException { // HTTP操作を担当します。
@@ -47,7 +68,7 @@ class TodoHandler {
                     String dueDateText = parameterValue(body, "dueDate");
                     if (title != null && !title.isBlank()) {
                         LocalDate dueDate = dueDateText == null || dueDateText.isBlank()
-                                ? null : LocalDate.parse(dueDateText);
+                                ? LocalDate.now() : LocalDate.parse(dueDateText); // 空欄なら追加した日を予定日にします。
                         repository.insertTodo(title, dueDate);
                     }
                 } catch (DateTimeParseException e) {
